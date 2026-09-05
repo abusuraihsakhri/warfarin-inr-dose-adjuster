@@ -1,6 +1,40 @@
+# Python
 __pycache__/
-*.pyc
+*.py[cod]
 *.pyo
+*.egg-info/
+*.egg
+.eggs/
+dist/
+build/
+sdist/
+
+# Virtual environments
+venv/
+.venv/
+env/
+.env
+
+# Testing
 .pytest_cache/
+.coverage
+htmlcov/
+.tox/
+nosetests.xml
+coverage.xml
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project specific
 results.csv
 output.csv
+*.log

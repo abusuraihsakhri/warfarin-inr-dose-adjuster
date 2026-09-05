@@ -236,7 +236,7 @@ class TestTapering:
 
     def test_taper_to_zero(self):
         result = generate_taper_schedule(50.0, 0.0, 10.0, 7)
-        assert result["schedule"][-1]["weekly_dose_mg"] == 0.0 or result["schedule"][-1]["mme"] == 0.0
+        assert result["schedule"][-1]["weekly_dose_mg"] == 0.0
 
     def test_invalid_target_higher(self):
         with pytest.raises(ValueError):
@@ -298,3 +298,73 @@ class TestCLI:
     def test_assess_command(self):
         ret = main(["assess", "--inr", "2.5", "--weekly-dose", "35"])
         assert ret == 0
+
+    def test_audit_command(self):
+        ret = main(["audit", "--task-id", "CLI-TEST-01"])
+        assert ret == 0
+
+    def test_chat_command(self):
+        ret = main(["chat", "Explain", "warfarin", "dosing"])
+        assert ret == 0
+
+    def test_verify_audit_command(self):
+        ret = main(["verify-audit"])
+        assert ret == 0
+
+
+# ============================================================================
+# Edge Case Tests
+# ============================================================================
+
+class TestEdgeCases:
+    def test_inr_exactly_at_boundaries(self):
+        """Test INR values exactly at therapeutic boundaries."""
+        assert interpret_inr(1.5)["status"] == "SUBTHERAPEUTIC"
+        assert interpret_inr(2.0)["status"] == "THERAPEUTIC"
+        assert interpret_inr(3.0)["status"] == "THERAPEUTIC"
+        assert interpret_inr(3.1)["status"] == "MILDLY_SUPRATHERAPEUTIC"
+
+    def test_inr_just_below_dangerous(self):
+        """Test INR just below dangerous threshold."""
+        result = interpret_inr(4.5)
+        assert result["status"] == "SUPRATHERAPEUTIC"
+        assert result["hold_doses"] == 1
+
+    def test_inr_exactly_at_dangerous(self):
+        """Test INR exactly at dangerous threshold."""
+        result = interpret_inr(10.0)
+        assert result["status"] == "DANGEROUS"
+
+    def test_dose_adjustment_preserves_minimum(self):
+        """Test that dose adjustment never goes negative."""
+        result = calculate_new_weekly_dose(1.0, 12.0)
+        assert result["new_weekly_dose_mg"] >= 0
+
+    def test_ttr_with_identical_inr_values(self):
+        """Test TTR with all identical INR values."""
+        result = calculate_ttr_simple([2.5, 2.5, 2.5])
+        assert result["ttr_percent"] == 100.0
+
+    def test_ttr_single_value_out_of_range(self):
+        """Test TTR with single out-of-range value."""
+        result = calculate_ttr_simple([4.0])
+        assert result["ttr_percent"] == 0.0
+
+    def test_pharmacogenomic_case_insensitive(self):
+        """Test that pharmacogenomic status is case-insensitive."""
+        result = apply_pharmacogenomic_adjustment(35.0, "POOR", "SENSITIVE")
+        assert result["cyp2c9_multiplier"] == 0.60
+        assert result["vkorc1_multiplier"] == 0.65
+
+    def test_taper_single_step(self):
+        """Test taper schedule with small reduction."""
+        result = generate_taper_schedule(10.0, 9.0, 5.0, 7)
+        assert result["total_steps"] >= 2
+        assert result["schedule"][-1]["weekly_dose_mg"] == 9.0
+
+    def test_daily_schedule_total_dose(self):
+        """Test that daily schedule sums close to weekly dose."""
+        weekly = 35.0
+        result = generate_daily_schedule(weekly)
+        total = sum(day["dose_mg"] for day in result["schedule"].values())
+        assert abs(total - weekly) < 7  # Within 7mg tolerance

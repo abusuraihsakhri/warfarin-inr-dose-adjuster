@@ -679,7 +679,23 @@ def main(argv=None):
     assess_parser.add_argument("--weekly-dose", type=float, required=True, help="Current weekly dose mg")
     assess_parser.add_argument("--cyp2c9", default="normal", help="CYP2C9 status")
     assess_parser.add_argument("--vkorc1", default="normal", help="VKORC1 status")
-    
+
+    # --- Audit command ---
+    audit_parser = subparsers.add_parser("audit", help="Run a supervisor audit task")
+    audit_parser.add_argument("--task-id", default="CLI-AUDIT-01", help="Task identifier")
+    audit_parser.add_argument("--target", default="SPECIMEN-CLI", help="Target identifier")
+    audit_parser.add_argument("--primary", type=float, default=12.0, help="Primary metric value")
+    audit_parser.add_argument("--secondary", type=float, default=4.0, help="Secondary metric value")
+    audit_parser.add_argument("--descriptor", default="NOMINAL", help="Status descriptor")
+    audit_parser.add_argument("--critical", action="store_true", help="Flag as critical")
+
+    # --- Chat command ---
+    chat_parser = subparsers.add_parser("chat", help="Query the supervisory chat")
+    chat_parser.add_argument("query", nargs="+", help="Query text")
+
+    # --- Verify-audit command ---
+    subparsers.add_parser("verify-audit", help="Verify HMAC audit trail integrity")
+
     args = parser.parse_args(argv)
     
     if args.command == "interpret":
@@ -708,7 +724,34 @@ def main(argv=None):
     elif args.command == "assess":
         result = full_warfarin_assessment(args.inr, args.weekly_dose, cyp2c9_metabolizer=args.cyp2c9, vkorc1_sensitivity=args.vkorc1)
         print(json.dumps(result, indent=2))
-    
+
+    elif args.command == "audit":
+        from agents.models import SystemTaskPayload
+        from agents.supervisor import SystemSupervisor
+        supervisor = SystemSupervisor(model_provider="mock")
+        payload = SystemTaskPayload(
+            task_id=args.task_id,
+            target_identifier=args.target,
+            primary_metric=args.primary,
+            secondary_metric=args.secondary,
+            status_descriptor=args.descriptor,
+            is_critical_flag=args.critical,
+        )
+        dossier = supervisor.process_task(payload)
+        print(json.dumps(dossier.to_dict(), indent=2, default=str))
+
+    elif args.command == "chat":
+        from agents.supervisor import SystemSupervisor
+        supervisor = SystemSupervisor(model_provider="mock")
+        query = " ".join(args.query)
+        response = supervisor.query_supervisory_chat(query)
+        print(json.dumps({"response": response}, indent=2))
+
+    elif args.command == "verify-audit":
+        from agents.base import AuditLogger
+        valid = AuditLogger.verify_integrity()
+        print(json.dumps({"audit_integrity_valid": valid, "blocks": len(AuditLogger.get_trail())}, indent=2))
+
     return 0
 
 
