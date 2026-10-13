@@ -1,236 +1,110 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Warfarin Inr Dose Adjuster — Operations Console</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
-    <style>
-        :root {
-            --bg: #090d16;
-            --card: #111827;
-            --border: #1f293d;
-            --accent: #3b82f6;
-            --accent-glow: rgba(59, 130, 246, 0.25);
-            --text: #f3f4f6;
-            --text-muted: #9ca3af;
-            --danger: #ef4444;
-            --warning: #f59e0b;
-            --success: #10b981;
-        }
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body {
-            font-family: 'Inter', sans-serif;
-            background: var(--bg);
-            color: var(--text);
-            padding: 2rem;
-            min-height: 100vh;
-        }
-        .header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border-bottom: 1px solid var(--border);
-            padding-bottom: 1.5rem;
-            margin-bottom: 2rem;
-        }
-        .header-title h1 { font-size: 1.6rem; font-weight: 700; color: #fff; }
-        .header-title p { color: var(--text-muted); font-size: 0.9rem; margin-top: 0.25rem; }
-        .badge {
-            display: inline-block;
-            padding: 0.3rem 0.8rem;
-            border-radius: 9999px;
-            font-size: 0.75rem;
-            font-weight: 600;
-            background: var(--accent-glow);
-            color: var(--accent);
-            border: 1px solid var(--accent);
-        }
-        .grid {
-            display: grid;
-            grid-template-columns: 1fr 1.2fr;
-            gap: 1.5rem;
-        }
-        .card {
-            background: var(--card);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 1.5rem;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
-        }
-        .card h2 {
-            font-size: 1.1rem;
-            font-weight: 600;
-            margin-bottom: 1rem;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-        .form-group { margin-bottom: 1rem; }
-        label { display: block; font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.4rem; }
-        input, select, textarea {
-            width: 100%;
-            padding: 0.65rem 0.9rem;
-            background: #0d1322;
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            color: #fff;
-            font-family: inherit;
-            font-size: 0.9rem;
-        }
-        input:focus, textarea:focus { outline: none; border-color: var(--accent); }
-        .btn {
-            background: var(--accent);
-            color: #fff;
-            border: none;
-            padding: 0.7rem 1.4rem;
-            border-radius: 6px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: 0.2s;
-            width: 100%;
-        }
-        .btn:hover { background: #2563eb; }
-        .terminal {
-            background: #060911;
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 1rem;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 0.85rem;
-            color: #10b981;
-            height: 380px;
-            overflow-y: auto;
-            white-space: pre-wrap;
-        }
-        .metrics-bar {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 1rem;
-            margin-bottom: 1.5rem;
-        }
-        .metric-box {
-            background: var(--card);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 1rem;
-            text-align: center;
-        }
-        .metric-val { font-size: 1.4rem; font-weight: 700; color: #fff; margin-top: 0.25rem; }
-        .metric-label { font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; }
-    </style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Offline INR range review, hypothetical weekly-dose arithmetic and Rosendaal TTR for research and teaching.">
+  <title>Warfarin INR Workbench | Research use</title>
+  <style>
+    :root { color-scheme: dark; --bg:#0b1320; --panel:#142033; --panel2:#101b2c; --ink:#eaf1fc; --muted:#afbed3; --border:#31445e; --accent:#88bafc; --danger:#ffa59f; --warn:#ffd18b; --ok:#a2e6c7; }
+    * { box-sizing:border-box; }
+    body { margin:0; font: 16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif; background:var(--bg); color:var(--ink); }
+    a { color:var(--accent); }
+    .wrap { width:min(1120px, calc(100% - 32px)); margin:0 auto; }
+    header { background:linear-gradient(155deg,#142a46,#0f1c2d); border-bottom:1px solid var(--border); padding:34px 0 24px; }
+    .eyebrow { color:var(--accent); font-size:.83rem; letter-spacing:.12em; text-transform:uppercase; font-weight:750; }
+    h1 { font-size:clamp(1.8rem,3.5vw,2.7rem); letter-spacing:-.04em; line-height:1.15; margin:10px 0; }
+    h2 { font-size:1.27rem; letter-spacing:-.02em; margin:0 0 9px; }
+    p { margin:8px 0 16px; }
+    .muted { color:var(--muted); }
+    .intro { max-width:760px; }
+    main { padding:26px 0 40px; }
+    .notice { border:1px solid #846844; background:#2b261f; border-radius:10px; padding:13px 17px; color:#fbe4bf; margin-bottom:24px; }
+    .layout { display:grid; grid-template-columns:1.1fr .9fr; gap:18px; align-items:start; }
+    .panel { background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:22px; min-width:0; }
+    .panel p { font-size:.93rem; }
+    .field { margin-top:16px; }
+    label { display:block; font-weight:650; font-size:.9rem; margin-bottom:6px; }
+    .hint { font-size:.82rem; color:var(--muted); margin:5px 0 0; }
+    input,select,textarea { font:inherit; background:var(--panel2); color:var(--ink); border:1px solid #536780; border-radius:8px; padding:11px 12px; width:100%; }
+    input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-visible,a:focus-visible { outline:3px solid var(--accent); outline-offset:2px; }
+    input[type=number] { min-width:0; }
+    textarea { resize:vertical; min-height:140px; font: .94rem/1.6 ui-monospace,SFMono-Regular,Consolas,monospace; }
+    .cols { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+    .subhead { margin:20px 0 8px; border-top:1px solid var(--border); padding-top:18px; font-size:1rem; }
+    button { appearance:none; background:var(--accent); color:#091423; border:0; border-radius:8px; padding:11px 17px; font-weight:750; cursor:pointer; margin-top:16px; }
+    button:hover { background:#b6d6ff; }
+    button.secondary { background:transparent; color:var(--ink); border:1px solid var(--border); }
+    button.secondary:hover { background:#243752; }
+    .result { white-space:pre-wrap; overflow-wrap:anywhere; padding:13px 15px; border-radius:9px; border:1px solid var(--border); background:#101b2c; margin:14px 0 0; min-height:54px; }
+    .result.error,.result.urgent { border-color:#a65f5a; color:#ffd2ce; background:#332228; }
+    .result.caution { border-color:#9c824d; color:#ffdfa5; }
+    .result.ok { border-color:#467b68; color:#d1f2e4; }
+    .status { color:var(--muted); font-size:.84rem; }
+    .resources { margin-top:20px; font-size:.88rem; }
+    footer { border-top:1px solid var(--border); padding:20px 0 30px; color:var(--muted); font-size:.84rem; }
+    @media (max-width:850px) { .layout { grid-template-columns:1fr; } }
+    @media (max-width:480px) { .cols { grid-template-columns:1fr; } .panel {padding:16px;} }
+    @media print { :root {color-scheme:light;} body {background:white;color:black;} header {background:white;} .panel,.notice,.result {border:1px solid #888;color:black;background:white;} input,select,textarea {color:black;background:white;} button {display:none;} }
+  </style>
+  <script src="./calculator.js" defer></script>
 </head>
 <body>
-
-    <div class="header">
-        <div class="header-title">
-            <h1>Warfarin Inr Dose Adjuster</h1>
-            <p>Domain: Clinical & Cryptographic AI | Standard: CAP / CLSI / NIST Standards | LabMind-Atlas Architecture</p>
-        </div>
-        <div>
-            <span class="badge">Air-Gapped Active</span>
-            <span class="badge" style="background: rgba(16,185,129,0.2); color: #10b981; border-color: #10b981;">Zero-PHI Guard Active</span>
-        </div>
+  <header>
+    <div class="wrap">
+      <div class="eyebrow">Anticoagulation research toolkit</div>
+      <h1>Warfarin INR workbench</h1>
+      <p class="intro muted">Target-range interpretation, manually specified percentage arithmetic, and interpolated time in therapeutic range (TTR). All calculations run in your browser.</p>
     </div>
-
-    <div class="metrics-bar">
-        <div class="metric-box">
-            <div class="metric-label">System Status</div>
-            <div class="metric-val" style="color: var(--success);" id="m-status">OPTIMAL</div>
+  </header>
+  <main class="wrap">
+    <div class="notice" role="note"><strong>Research and education only — not a prescribing tool.</strong> The workbench does not determine dose changes, hold instructions, bridging, vitamin K, or emergency reversal. For bleeding or markedly abnormal INR, follow an appropriate clinical escalation pathway.</div>
+    <div class="layout">
+      <section class="panel" aria-labelledby="inr-heading">
+        <h2 id="inr-heading">INR range review</h2>
+        <p class="muted">Set the therapeutic range appropriate to the indication. Neither target choice nor bleeding assessment can be inferred from INR alone.</p>
+        <form id="inr-form">
+          <div class="cols">
+            <div class="field"><label for="inr">Measured INR</label><input id="inr" name="inr" type="number" min="0.01" max="100" step="any" value="2.5" required></div>
+            <div class="field"><label for="bleeding">Bleeding assessment</label><select id="bleeding" name="bleeding"><option value="unknown">Not assessed</option><option value="no">No bleeding reported</option><option value="yes">Bleeding reported</option></select></div>
+            <div class="field"><label for="target-low">Target INR — lower</label><input id="target-low" name="target-low" type="number" min="0.1" max="4.5" step="any" value="2" required></div>
+            <div class="field"><label for="target-high">Target INR — upper</label><input id="target-high" name="target-high" type="number" min="0.1" max="4.5" step="any" value="3" required></div>
+          </div>
+          <h3 class="subhead">Optional arithmetic — enter a percentage yourself</h3>
+          <p class="hint">This section only evaluates a hypothetical percentage that you supply. It does not select or recommend a dose adjustment.</p>
+          <div class="cols">
+            <div class="field"><label for="weekly-dose">Current weekly total (mg)</label><input id="weekly-dose" name="weekly-dose" type="number" min="0.01" step="any" value="35"></div>
+            <div class="field"><label for="manual-change">Your hypothetical change (%)</label><input id="manual-change" name="manual-change" type="number" min="-100" max="100" step="any" value="0"></div>
+          </div>
+          <button type="submit">Review INR</button>
+        </form>
+        <div id="inr-result" class="result" role="status" aria-live="polite">Enter values and select Review INR.</div>
+      </section>
+      <section class="panel" aria-labelledby="ttr-heading">
+        <h2 id="ttr-heading">Rosendaal TTR</h2>
+        <p class="muted">Enter at least two measurements: one <strong>day, INR</strong> pair per line. Use the number of days since the first measurement (or any consistent day count).</p>
+        <form id="ttr-form">
+          <div class="field">
+            <label for="measurements">Measurement series</label>
+            <textarea id="measurements" name="measurements" spellcheck="false" required>0, 2.1
+7, 2.7
+14, 3.2
+21, 2.6</textarea>
+            <p class="hint">Uses the same target range as the INR review panel. Dates may be entered out of order; duplicate days are rejected. No extrapolation.</p>
+          </div>
+          <button type="submit">Calculate TTR</button>
+        </form>
+        <div id="ttr-result" class="result" role="status" aria-live="polite">TTR result will appear here.</div>
+        <button id="export-json" class="secondary" type="button">Export last result (JSON)</button>
+        <p id="download-status" class="status" role="status" aria-live="polite">Local export only; no upload or server storage.</p>
+        <div class="resources">
+          <strong>Method and clinical context</strong>
+          <p class="muted">Interpolated TTR assumes linear change between consecutive observations and does not assess clinical eligibility or warfarin indications.</p>
+          <p><a href="https://journal.chestnet.org/article/S0012-3692(12)60114-7/fulltext" rel="noopener noreferrer" target="_blank">CHEST antithrombotic guideline</a> · <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC5546947/" rel="noopener noreferrer" target="_blank">CPIC pharmacogenetics guideline</a></p>
         </div>
-        <div class="metric-box">
-            <div class="metric-label">Tasks Processed</div>
-            <div class="metric-val" id="m-tasks">142</div>
-        </div>
-        <div class="metric-box">
-            <div class="metric-label">Audit Blocks Signed</div>
-            <div class="metric-val" id="m-audit">142</div>
-        </div>
-        <div class="metric-box">
-            <div class="metric-label">PHI Interceptions</div>
-            <div class="metric-val" style="color: var(--accent);" id="m-phi">0</div>
-        </div>
+      </section>
     </div>
-
-    <div class="grid">
-        <div class="card">
-            <h2>⚙️ Dispatch Distributed Component Audit</h2>
-            <div class="form-group">
-                <label>Task / Sample ID</label>
-                <input type="text" id="task_id" value="TASK-2026-LIVE-01">
-            </div>
-            <div class="form-group">
-                <label>Target Identifier</label>
-                <input type="text" id="target_id" value="SPECIMEN-ALPHA-77">
-            </div>
-            <div class="form-group">
-                <label>Primary Measurement / Value</label>
-                <input type="number" id="primary_metric" value="29.4" step="0.1">
-            </div>
-            <div class="form-group">
-                <label>Secondary Metric / Kinetic Index</label>
-                <input type="number" id="secondary_metric" value="14.8" step="0.1">
-            </div>
-            <div class="form-group">
-                <label>Status / Phenotype Descriptor</label>
-                <input type="text" id="status_descriptor" value="DISCORDANT_ANOMALY">
-            </div>
-            <div class="form-group">
-                <label><input type="checkbox" id="is_critical" checked> Trigger Emergency / Critical Flag</label>
-            </div>
-            <button class="btn" onclick="runAudit()">Execute Distributed Component Audit</button>
-        </div>
-
-        <div class="card">
-            <h2>📊 Real-Time Consensus Dossier & Audit Log</h2>
-            <div class="terminal" id="outputConsole">// Warfarin Inr Dose Adjuster Operations Console Ready
-// Connection established with Air-Gapped Supervisor
-// Cryptographic HMAC-SHA256 audit ledger loaded.
-// Ready for live task payload dispatch...</div>
-        </div>
-    </div>
-
-    <script>
-        async function runAudit() {
-            const consoleEl = document.getElementById('outputConsole');
-            consoleEl.innerText = "// Dispatching task across specialized workers...
-// Invoking InvariantQCWorker, SafetyEscalationWorker, ProtocolWorker...";
-
-            const payload = {
-                task_id: document.getElementById('task_id').value,
-                target_identifier: document.getElementById('target_id').value,
-                primary_metric: parseFloat(document.getElementById('primary_metric').value),
-                secondary_metric: parseFloat(document.getElementById('secondary_metric').value),
-                status_descriptor: document.getElementById('status_descriptor').value,
-                is_critical_flag: document.getElementById('is_critical').checked
-            };
-
-            try {
-                const res = await fetch('/api/audit', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-                const data = await res.json();
-                consoleEl.innerText = JSON.stringify(data, null, 2);
-                document.getElementById('m-tasks').innerText = parseInt(document.getElementById('m-tasks').innerText) + 1;
-                document.getElementById('m-audit').innerText = parseInt(document.getElementById('m-audit').innerText) + 1;
-            } catch (err) {
-                consoleEl.innerText = "// Offline / Simulation Output:\n" + JSON.stringify({
-                    dossier_id: "DOSSIER-SIM-" + Math.floor(Math.random()*10000),
-                    system: "warfarin-inr-dose-adjuster",
-                    domain: "Clinical & Cryptographic AI",
-                    task_id: payload.task_id,
-                    overall_urgency: payload.is_critical_flag ? "CRITICAL_STAT_PANIC" : "ELEVATED_RISK",
-                    integrity_status: "DISCORDANT_ANOMALY",
-                    alerts: [
-                        { worker: "InvariantQCWorker", alert: "Primary metric exceeds upper reference bound" },
-                        { worker: "SafetyEscalationWorker", alert: "Critical emergency interlock flag active" }
-                    ],
-                    audit_hash: "HMAC_SHA256_e83f9a72b941d6c381f9"
-                }, null, 2);
-            }
-        }
-    </script>
+  </main>
+  <footer><div class="wrap">Privacy: no patient identifiers requested, calculations stay on this device, and input is not transmitted or persisted by the application. Do not enter identifiable clinical data. <a href="https://github.com/abusuraihsakhri/warfarin-inr-dose-adjuster">Source repository</a>.</div></footer>
 </body>
 </html>
