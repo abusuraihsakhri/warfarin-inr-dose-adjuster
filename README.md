@@ -1,189 +1,78 @@
 # Warfarin INR Dose Adjuster
 
-> **Domain:** Clinical Pharmacology & Precision Pharmacotherapy  
-> **Reference Guidelines & Standards:** ACCP Guidelines, CPIC Guidelines & FDA Table of Pharmacogenomic Biomarkers
+A research and teaching toolkit for warfarin INR range review, hypothetical weekly-dose arithmetic, and time in therapeutic range (TTR) calculation.
 
-<div align="center">
+**For research/education only. Not a validated clinical decision-support device or a prescribing protocol.** INR interpretation requires bleeding assessment, indication, target range, adherence, concomitant medication review and clinician judgment. Do not use outputs to prescribe, withhold medication, bridge anticoagulation or administer vitamin K.
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-![Python](https://img.shields.io/badge/Python-3.10%20%7C%203.11%20%7C%203.12-3776AB.svg?logo=python&logoColor=white)
-![FastAPI](https://img.shields.io/badge/FastAPI-0.111-009688.svg?logo=fastapi&logoColor=white)
-![Audit Trail](https://img.shields.io/badge/Audit-HMAC--SHA256_Tamper--Evident-brightgreen.svg)
-![Zero-PHI Guard](https://img.shields.io/badge/Guard-Zero--PHI_Outbound-blue.svg)
-![Docker](https://img.shields.io/badge/Docker-Ready-2496ED.svg?logo=docker&logoColor=white)
+## Browser workbench
 
-</div>
+Open `web/index.html` in a current desktop or mobile browser. No build, server, Python, Pyodide or account is needed. The interface provides:
 
----
+- INR assessment relative to a **user-defined** therapeutic target, with escalation messages for reported bleeding and INR above 4.5.
+- Hypothetical weekly/daily dose arithmetic from a **percentage entered by the user**. It does not choose an adjustment or issue dosing instructions.
+- Rosendaal interpolated TTR from pairs of measurement day and INR, without extrapolating beyond recorded observations.
+- Local export of the latest result as JSON.
 
-## 📖 What It Does
+The browser implementation performs no network requests, does not persist measurements, and does not ask for identifiers. Do not enter identifiable patient information. External references and GitHub links open only if explicitly selected.
 
-Warfarin INR Dose Adjustment Calculator implementing evidence-based dose adjustment per ACCP guidelines.
+**GitHub Pages:** The repository has Pages metadata, but public deployment must be separately verified; do not rely on the repository homepage until it has been checked. Source: [browser workbench](web/index.html).
 
-Key features:
-- INR interpretation with clinical action thresholds
-- Dose adjustment algorithm (percentage-based)
-- Time in Therapeutic Range (TTR) calculation using Rosendaal method
-- Pharmacogenomics factor consideration (CYP2C9, VKORC1)
-- Tapering schedule generation
-- Weekly dose tracking
-- CLI interface for all operations
-- FastAPI REST API with audit trail
+## Python CLI
 
-Author: Dr. Abu Suraih Sakhri
-License: MIT
-
----
-
-## ⚙️ Key Capabilities & Algorithmic Modules
-
-### 🔬 Analytical Functions
-
-- **`interpret_inr()`**: Interpret INR value and provide clinical guidance.
-- **`calculate_new_weekly_dose()`**: Calculate new weekly warfarin dose based on current INR.
-- **`generate_daily_schedule()`**: Generate a daily dosing schedule from weekly dose.
-- **`calculate_ttr_rosendaal()`**: Calculate Time in Therapeutic Range using Rosendaal's linear interpolation method.
-- **`calculate_ttr_simple()`**: Calculate simple percentage of INR values in therapeutic range.
-- **`apply_pharmacogenomic_adjustment()`**: Apply CYP2C9/VKORC1-based dose adjustments.
-- **`generate_taper_schedule()`**: Generate a gradual tapering schedule for dose reduction.
-- **`full_warfarin_assessment()`**: Complete warfarin dosing assessment combining all modules.
-
----
-
-## 💻 Installation
+Python 3.10–3.12:
 
 ```bash
-# Clone the repository
-git clone https://github.com/abusuraihsakhri/warfarin-inr-dose-adjuster.git
-cd warfarin-inr-dose-adjuster
-
-# Install dependencies
-pip install -r requirements.txt
-```
-
----
-
-## 💻 CLI Quickstart & Usage
-
-### 1. Interpret INR Value
-```bash
+python -m pip install -r requirements.txt
 python cli.py interpret --inr 2.5
+python cli.py adjust --inr 3.3 --weekly-dose 35 --target-low 2 --target-high 3
+python cli.py ttr --inr-values 1.5 3.5 --days 0 14
+python cli.py pgx --dose 35 --cyp2c9 normal --vkorc1 normal
+python cli.py assess --inr 2.5 --weekly-dose 35
+python -m pytest -q
 ```
 
-### 2. Calculate Dose Adjustment
-```bash
-python cli.py adjust --inr 3.3 --weekly-dose 35
-```
+`interpret_inr` and `calculate_new_weekly_dose` are **illustrative**, not patient-specific instructions. At INR > 4.5, the calculator deliberately returns no automatic dose, dose hold, or vitamin K order. If bleeding is present, follow the appropriate urgent management pathway independently of this tool.
 
-### 3. Calculate Time in Therapeutic Range
-```bash
-# Simple method
-python cli.py ttr --inr-values 2.1 2.5 2.8 2.3 2.7
+`calculate_ttr_rosendaal` interpolates between recorded INR values and rejects duplicate days or nonfinite measurements. Single-measurement percentages computed by `calculate_ttr_simple` are *not* a Rosendaal time estimate.
 
-# Rosendaal method (with days)
-python cli.py ttr --inr-values 2.0 3.0 --days 0 14
-```
+`apply_pharmacogenomic_adjustment` contains **unvalidated sensitivity multipliers for research illustration only**, not CPIC/IWPC/Gage genotype dosing. The combined assessment does not automatically apply these multipliers to an INR-titrated maintenance dose. The legacy tapering and daily-tablet helpers are not validated for use as clinical regimens.
 
-### 4. Pharmacogenomic Adjustment
-```bash
-python cli.py pgx --dose 35 --cyp2c9 poor --vkorc1 sensitive
-```
+## Optional backend
 
-### 5. Generate Tapering Schedule
-```bash
-python cli.py taper --current-dose 50 --target-dose 30
-```
-
-### 6. Full Assessment
-```bash
-python cli.py assess --inr 2.5 --weekly-dose 35 --cyp2c9 normal --vkorc1 normal
-```
-
-### 7. Run Supervisor Audit
-```bash
-python cli.py audit --task-id TASK-001 --primary 12.0 --secondary 4.0
-```
-
-### 8. Query Supervisory Chat
-```bash
-python cli.py chat "Explain warfarin dosing"
-```
-
-### 9. Verify Audit Trail Integrity
-```bash
-python cli.py verify-audit
-```
-
----
-
-## 🛡️ Security & Enterprise Architecture
-
-* **Zero-PHI Outbound Interceptor:** Active regex inspection blocking SSNs, MRNs, phone numbers, and patient identifiers.
-* **Tamper-Evident HMAC-SHA256 Audit Trail:** Chained, cryptographically signed logs for every evaluation and state transition.
-* **Air-Gapped LLM Reasoning Adapter:** Agnostic integration for local Ollama instances, Claude, GPT-4o, and deterministic test mocks.
-* **FastAPI & Prometheus Telemetry:** Exposes OpenAPI 3.1 REST endpoints and operational Prometheus metrics (`/metrics`).
-
----
-
-## 🧪 Testing & Verification
-
-Run the automated test suite:
+The repository also includes a FastAPI demonstration supervisor and generic audit service (not a medical dosing API):
 
 ```bash
-pytest -v
+python cli.py serve
 ```
 
-Execute high-throughput batch simulation benchmarks:
+**Note:** The legacy CLI does not implement `serve`; run the server directly instead:
 
 ```bash
-python simulator.py --tasks 1000 --concurrency 8
+python -m uvicorn agents.api:app --host 127.0.0.1 --port 8000
 ```
 
----
-
-## 🐳 Container Deployment
+Docker:
 
 ```bash
-docker build -t warfarin-inr-dose-adjuster .
-docker run -p 8000:8000 warfarin-inr-dose-adjuster
+export AUDIT_SECRET_KEY="$(python -c 'import secrets; print(secrets.token_hex(32))')"
+docker compose up --build
 ```
 
-Or using docker-compose:
+Audit records are in-memory, not a durable compliant clinical record. `GET /api/audit/logs` is disabled unless `AUDIT_LOG_READ_TOKEN` is configured and provided as `Authorization: Bearer <token>`. This demonstration server has no general user authentication and must **not** be exposed publicly or used for identifiable patient information. The heuristic PHI filter cannot guarantee de-identification.
+
+## Test and implementation notes
 
 ```bash
-docker-compose up -d
+python -m pytest -q
+node --check web/calculator.js
+node --test web/tests/calculator.test.cjs
 ```
 
----
+The browser code uses dependency-free JavaScript. The backend uses Python, FastAPI, Uvicorn and Pydantic. The GitHub Actions pipeline tests Python 3.10–3.12 and Node 22. Current browsers supporting standard JavaScript, Blob downloads and CSS Grid should work. MIT license: [LICENSE](LICENSE).
 
-## 📁 Project Structure
+## Clinical references
 
-```
-warfarin-inr-dose-adjuster/
-├── warfarin_titration.py      # Core algorithm & CLI entry point
-├── cli.py                     # CLI wrapper
-├── enrichment.py              # Enrichment engine modules
-├── simulator.py               # High-throughput simulation
-├── agents/                    # Enterprise agent framework
-│   ├── base.py               # PHI guard, audit trail, security
-│   ├── models.py             # Pydantic data models
-│   ├── supervisor.py         # Multi-agent supervisor
-│   ├── workers.py            # Specialized domain workers
-│   ├── api.py                # FastAPI REST endpoints
-│   ├── metrics.py            # Prometheus metrics
-│   ├── llm_factory.py        # LLM provider factory
-│   ├── learning.py           # Active learning calibration
-│   └── streamer.py           # WebSocket telemetry
-├── tests/                     # Test suite
-├── web/                       # Operations console (HTML)
-├── requirements.txt           # Python dependencies
-├── Dockerfile                 # Container build
-├── docker-compose.yml         # Container orchestration
-└── benchmark_dataset.json     # Golden benchmark test cases
-```
+- CHEST/ACCP antithrombotic guideline (2012), section 9: INR 4.5–10 without bleeding and INR >10 without bleeding. <https://journal.chestnet.org/article/S0012-3692(12)60114-7/fulltext>
+- CPIC guideline for pharmacogenetics-guided warfarin dosing (2017): published validated multivariable algorithms, rather than simple genotype multipliers. <https://pmc.ncbi.nlm.nih.gov/articles/PMC5546947/>
 
----
-
-## ⚠️ Disclaimer
-
-**FOR EDUCATIONAL/RESEARCH USE ONLY.** This tool is not a substitute for clinical pharmacist review or professional medical judgment. Always verify dosing decisions with qualified healthcare professionals.
+**Validation status:** Automated regression tests do not establish clinical validation, medical regulatory approval or patient safety.
