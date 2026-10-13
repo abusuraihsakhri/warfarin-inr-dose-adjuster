@@ -48,19 +48,20 @@ class TestINRInterpretation:
     def test_supratherapeutic(self):
         result = interpret_inr(4.0)
         assert result["status"] == "SUPRATHERAPEUTIC"
-        assert result["hold_doses"] == 1
+        assert result["hold_doses"] is None
 
     def test_dangerous(self):
         result = interpret_inr(6.0)
         assert result["status"] == "DANGEROUS"
-        assert result["vitamin_k"] is not None
-        assert result["hold_doses"] == 2
+        assert result["vitamin_k"] is None
+        assert result["hold_doses"] is None
 
     def test_critical(self):
         result = interpret_inr(12.0)
         assert result["status"] == "CRITICAL"
         assert result["risk_level"] == "CRITICAL"
-        assert result["vitamin_k"]["dose_mg"] == 5.0
+        assert result["vitamin_k"] is None
+        assert result["dose_change_percent"] is None
 
     def test_boundary_therapeutic_low(self):
         result = interpret_inr(2.0)
@@ -99,13 +100,15 @@ class TestDoseAdjustment:
 
     def test_dangerous_hold(self):
         result = calculate_new_weekly_dose(35.0, 5.0)
-        assert result["hold_doses"] == 2
-        assert result["vitamin_k"] is not None
+        assert result["hold_doses"] is None
+        assert result["vitamin_k"] is None
+        assert result["new_weekly_dose_mg"] is None
 
     def test_critical_hold(self):
         result = calculate_new_weekly_dose(35.0, 12.0)
-        assert result["hold_doses"] == 3
-        assert result["vitamin_k"]["dose_mg"] == 5.0
+        assert result["hold_doses"] is None
+        assert result["vitamin_k"] is None
+        assert result["new_weekly_dose_mg"] is None
 
     def test_custom_target_range(self):
         result = calculate_new_weekly_dose(35.0, 2.8, 2.5, 3.5)
@@ -328,7 +331,7 @@ class TestEdgeCases:
         """Test INR just below dangerous threshold."""
         result = interpret_inr(4.5)
         assert result["status"] == "SUPRATHERAPEUTIC"
-        assert result["hold_doses"] == 1
+        assert result["hold_doses"] is None
 
     def test_inr_exactly_at_dangerous(self):
         """Test INR exactly at dangerous threshold."""
@@ -368,3 +371,54 @@ class TestEdgeCases:
         result = generate_daily_schedule(weekly)
         total = sum(day["dose_mg"] for day in result["schedule"].values())
         assert abs(total - weekly) < 7  # Within 7mg tolerance
+
+# Regression tests for target-aware classification, high-INR safety and TTR.
+@pytest.mark.parametrize("value", [float("nan"), float("inf"), float("-inf")])
+def test_nonfinite_inputs_rejected(value):
+    with pytest.raises(ValueError):
+        interpret_inr(value)
+    with pytest.raises(ValueError):
+        calculate_new_weekly_dose(value, 2.5)
+    with pytest.raises(ValueError):
+        calculate_ttr_simple([2.5, value])
+    with pytest.raises(ValueError):
+        apply_pharmacogenomic_adjustment(value)
+
+
+def test_custom_target_used_for_actual_classification():
+    assert interpret_inr(3.3, 2.5, 3.5)["status"] == "THERAPEUTIC"
+    assert calculate_new_weekly_dose(35, 3.3, 2.5, 3.5)["new_weekly_dose_mg"] == 35
+    assert interpret_inr(2.2, 2.5, 3.5)["status"] == "SUBTHERAPEUTIC"
+    with pytest.raises(ValueError):
+        interpret_inr(2.5, 3.5, 2.5)
+
+
+@pytest.mark.parametrize("inr", [4.51, 6, 10, 11])
+def test_high_inr_requires_human_action_not_automatic_orders(inr):
+    review = calculate_new_weekly_dose(35, inr)
+    assert review["new_weekly_dose_mg"] is None
+    assert review["hold_doses"] is None
+    assert review["vitamin_k"] is None
+    assert review["not_a_prescription"] is True
+
+
+def test_rosendaal_crossing_both_bounds_in_both_directions():
+    for vals in ([1.0, 4.0], [4.0, 1.0]):
+        result = calculate_ttr_rosendaal(vals, [0, 9])
+        assert result["ttr_percent"] == 33.3
+        assert result["days_in_range"] == 3
+
+
+def test_rosendaal_duplicate_days_and_invalid_values():
+    with pytest.raises(ValueError):
+        calculate_ttr_rosendaal([2.0, 3.0], [0, 0])
+    with pytest.raises(ValueError):
+        calculate_ttr_rosendaal([2.0, -1.0], [0, 7])
+
+
+def test_full_assessment_does_not_compound_pgx_onto_maintenance():
+    result = full_warfarin_assessment(2.5, 35, cyp2c9_metabolizer="poor")
+    assert result["pharmacogenomic_adjustment"]["applied_to_maintenance_dose"] is False
+    assert result["daily_schedule"]["weekly_dose_mg"] == 35
+    unsafe = full_warfarin_assessment(6.0, 35)
+    assert unsafe["daily_schedule"] is None
