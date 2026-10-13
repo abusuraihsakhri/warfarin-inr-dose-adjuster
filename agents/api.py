@@ -1,8 +1,10 @@
 """
 FastAPI REST API Server for Warfarin Inr Dose Adjuster.
 """
+import os
+import hmac
 from typing import Dict, Any, List
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Header
 from pydantic import BaseModel
 from .base import AuditLogger, PHIGuard
 from .models import SystemTaskPayload, ConsensusDossier
@@ -51,5 +53,9 @@ def api_chat(req: ChatRequest):
 
 
 @app.get("/api/audit/logs")
-def api_audit_logs():
+def api_audit_logs(authorization: str | None = Header(default=None)):
+    """No anonymous access to audit records, even in test deployments."""
+    expected = os.getenv("AUDIT_LOG_READ_TOKEN")
+    if not expected or not authorization or not hmac.compare_digest(authorization, "Bearer " + expected):
+        raise HTTPException(status_code=403, detail="Audit log access disabled or unauthorized")
     return {"audit_trail": AuditLogger.get_trail(), "verified": AuditLogger.verify_integrity()}

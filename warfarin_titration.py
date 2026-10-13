@@ -64,104 +64,69 @@ VKORC1_SENSITIVITY_MULTIPLIERS = {
 # INR Interpretation
 # ============================================================================
 
-def interpret_inr(inr: float) -> Dict[str, Any]:
-    """
-    Interpret INR value and provide clinical guidance.
-    
-    Args:
-        inr: International Normalized Ratio
-        
-    Returns:
-        Dictionary with interpretation, risk level, and action
-    """
+def _validate_inr_and_target(inr: float, target_low: float, target_high: float) -> None:
+    """Reject non-finite inputs and invalid therapeutic targets."""
+    values = (inr, target_low, target_high)
+    if not all(isinstance(x, (int, float)) and math.isfinite(x) for x in values):
+        raise ValueError("INR and target limits must be finite numbers")
     if inr <= 0:
         raise ValueError("INR must be positive")
-    
-    if inr < 1.5:
-        return {
-            "inr": inr,
-            "status": "HIGHLY_SUBTHERAPEUTIC",
-            "risk_level": "HIGH",
-            "action": "Increase dose significantly. Consider bridging with LMWH if high thrombotic risk.",
-            "dose_change_percent": 15.0,
-            "hold_doses": 0,
-            "recheck_days": 7,
-            "vitamin_k": None,
-            "notes": "Significantly below therapeutic range. Assess compliance and drug interactions."
-        }
-    elif inr < 2.0:
-        return {
-            "inr": inr,
-            "status": "SUBTHERAPEUTIC",
-            "risk_level": "MODERATE",
-            "action": "Increase weekly dose by 5-15%. Recheck INR in 1-2 weeks.",
-            "dose_change_percent": DOSE_INCREASE_MILD * 100,
-            "hold_doses": 0,
-            "recheck_days": 10,
-            "vitamin_k": None,
-            "notes": "Below therapeutic range. Consider dietary vitamin K changes or medication interactions."
-        }
-    elif inr <= 3.0:
-        return {
-            "inr": inr,
-            "status": "THERAPEUTIC",
-            "risk_level": "LOW",
-            "action": "No dose change. Continue current regimen.",
-            "dose_change_percent": 0.0,
-            "hold_doses": 0,
-            "recheck_days": 28,
-            "vitamin_k": None,
-            "notes": "Within therapeutic range (2.0-3.0). Maintain current dosing."
-        }
-    elif inr <= 3.5:
-        return {
-            "inr": inr,
-            "status": "MILDLY_SUPRATHERAPEUTIC",
-            "risk_level": "MODERATE",
-            "action": "Decrease weekly dose by 5-15%. Recheck INR in 1-2 weeks.",
-            "dose_change_percent": -DOSE_DECREASE_MILD * 100,
-            "hold_doses": 0,
-            "recheck_days": 10,
-            "vitamin_k": None,
-            "notes": "Slightly above therapeutic range. Assess for dietary changes or drug interactions."
-        }
-    elif inr <= 4.5:
-        return {
-            "inr": inr,
-            "status": "SUPRATHERAPEUTIC",
-            "risk_level": "HIGH",
-            "action": "Hold 1 dose. Decrease weekly dose by 10-20%. Recheck INR in 1 week.",
-            "dose_change_percent": -DOSE_DECREASE_MODERATE * 100,
-            "hold_doses": 1,
-            "recheck_days": 7,
-            "vitamin_k": None,
-            "notes": "Above therapeutic range. Hold one dose and reduce maintenance. Check for interactions."
-        }
-    elif inr <= 10.0:
-        return {
-            "inr": inr,
-            "status": "DANGEROUS",
-            "risk_level": "VERY_HIGH",
-            "action": "Hold 1-2 doses. Give vitamin K 1-2.5 mg PO. Recheck INR in 24 hours.",
-            "dose_change_percent": -20.0,
-            "hold_doses": 2,
-            "recheck_days": 1,
-            "vitamin_k": {"dose_mg": 2.5, "route": "PO", "note": "1-2.5 mg oral vitamin K"},
-            "notes": "Dangerously elevated. Administer vitamin K and monitor closely for bleeding."
-        }
-    else:  # INR > 10
-        return {
-            "inr": inr,
-            "status": "CRITICAL",
-            "risk_level": "CRITICAL",
-            "action": "Hold warfarin. Give vitamin K 2.5-5 mg PO. Recheck INR in 24 hours. Consider hospitalization.",
-            "dose_change_percent": -25.0,
-            "hold_doses": 3,
-            "recheck_days": 1,
-            "vitamin_k": {"dose_mg": 5.0, "route": "PO", "note": "2.5-5 mg oral vitamin K"},
-            "notes": "Critical INR. High bleeding risk. Administer vitamin K urgently. Evaluate for active bleeding."
-        }
+    if not (0 < target_low < target_high <= 4.5):
+        raise ValueError("Require 0 < target INR low < target INR high <= 4.5")
 
+
+def interpret_inr(
+    inr: float,
+    target_inr_low: float = INR_THERAPEUTIC_LOW,
+    target_inr_high: float = INR_THERAPEUTIC_HIGH,
+) -> Dict[str, Any]:
+    """Educational interpretation only; bleeding status and clinical context are unknown.
+
+    A high INR requires clinical assessment rather than an automatic vitamin K,
+    withholding, or maintenance-dose order. The percentage values below are
+    illustrative nomogram arithmetic, not patient-specific recommendations.
+    """
+    _validate_inr_and_target(inr, target_inr_low, target_inr_high)
+    shared = {
+        "inr": inr,
+        "target_range": f"{target_inr_low}-{target_inr_high}",
+        "vitamin_k": None,
+        "not_a_prescription": True,
+    }
+    if inr > 10.0:
+        info = ("CRITICAL", "CRITICAL", None, None, 1,
+                "Urgent same-day assessment. Oral vitamin K may be appropriate without bleeding; major bleeding requires emergency reversal protocols.",
+                "Bleeding status is not assessed. Do not use an automated maintenance dose or vitamin K order.")
+    elif inr > 4.5:
+        info = ("DANGEROUS", "VERY_HIGH", None, None, 1,
+                "Urgent clinician review of bleeding, medications and anticoagulation plan.",
+                "CHEST suggests against routine vitamin K for INR 4.5-10 without bleeding. Major bleeding requires emergency assessment.")
+    elif target_inr_low <= inr <= target_inr_high:
+        info = ("THERAPEUTIC", "LOW", 0.0, 0, 28,
+                "Within the specified INR target; verify clinical context and follow-up plan.",
+                "No automatic change. Recheck interval depends on stability and indication.")
+    elif inr < target_inr_low:
+        very_low = inr < target_inr_low - 0.5
+        info = ("HIGHLY_SUBTHERAPEUTIC" if very_low else "SUBTHERAPEUTIC",
+                "HIGH" if very_low else "MODERATE",
+                15.0 if very_low else 10.0, 0, 7 if very_low else 10,
+                "Below the specified target. Review adherence, interacting drugs, indication and thrombosis risk.",
+                "Illustrative percentage only. Bridging is not determined from INR alone.")
+    else:
+        markedly_high = inr > target_inr_high + 0.5
+        info = ("SUPRATHERAPEUTIC" if markedly_high else "MILDLY_SUPRATHERAPEUTIC",
+                "HIGH" if markedly_high else "MODERATE",
+                -15.0 if markedly_high else -10.0, None if markedly_high else 0,
+                7 if markedly_high else 10,
+                "Above the specified target. Assess bleeding and review the anticoagulation protocol.",
+                "Illustrative percentage only; whether to hold doses requires individualized assessment.")
+    status, risk, change, hold, recheck, action, notes = info
+    return {
+        **shared, "status": status, "risk_level": risk,
+        "dose_change_percent": change, "hold_doses": hold,
+        "recheck_days": recheck, "action": action, "notes": notes,
+        "requires_clinician_review": risk in ("HIGH", "VERY_HIGH", "CRITICAL"),
+    }
 
 # ============================================================================
 # Dose Adjustment
@@ -173,51 +138,31 @@ def calculate_new_weekly_dose(
     target_inr_low: float = INR_THERAPEUTIC_LOW,
     target_inr_high: float = INR_THERAPEUTIC_HIGH
 ) -> Dict[str, Any]:
-    """
-    Calculate new weekly warfarin dose based on current INR.
-    
-    Args:
-        current_weekly_dose_mg: Current total weekly dose in mg
-        inr: Current INR value
-        target_inr_low: Lower bound of target INR range
-        target_inr_high: Upper bound of target INR range
-        
-    Returns:
-        Dictionary with dose adjustment details
-    """
-    if current_weekly_dose_mg <= 0:
-        raise ValueError("Current weekly dose must be positive")
-    if inr <= 0:
-        raise ValueError("INR must be positive")
-    
-    interp = interpret_inr(inr)
-    
-    # Calculate adjustment
+    """Illustrative weekly percentage arithmetic; never an autonomous prescription."""
+    if not isinstance(current_weekly_dose_mg, (int, float)) or not math.isfinite(current_weekly_dose_mg) or current_weekly_dose_mg <= 0:
+        raise ValueError("Current weekly dose must be a finite positive number")
+    interp = interpret_inr(inr, target_inr_low, target_inr_high)
     change_pct = interp["dose_change_percent"]
-    dose_change_mg = current_weekly_dose_mg * (change_pct / 100)
-    new_weekly_dose = current_weekly_dose_mg + dose_change_mg
-    
-    # Ensure dose doesn't go negative
-    new_weekly_dose = max(0, new_weekly_dose)
-    
-    # Calculate daily dose equivalent
-    new_daily_dose = new_weekly_dose / 7
-    
+    change_mg = None if change_pct is None else current_weekly_dose_mg * change_pct / 100
+    new_weekly = None if change_mg is None else current_weekly_dose_mg + change_mg
     return {
         "current_weekly_dose_mg": current_weekly_dose_mg,
         "inr": inr,
-        "target_range": f"{target_inr_low}-{target_inr_high}",
+        "target_range": interp["target_range"],
         "status": interp["status"],
         "dose_change_percent": change_pct,
-        "dose_change_mg": round(dose_change_mg, 1),
-        "new_weekly_dose_mg": round(new_weekly_dose, 1),
-        "new_daily_dose_mg": round(new_daily_dose, 1),
+        "dose_change_mg": None if change_mg is None else round(change_mg, 2),
+        "new_weekly_dose_mg": None if new_weekly is None else round(new_weekly, 2),
+        "new_daily_dose_mg": None if new_weekly is None else round(new_weekly / 7, 2),
         "hold_doses": interp["hold_doses"],
         "recheck_days": interp["recheck_days"],
-        "vitamin_k": interp["vitamin_k"],
+        "vitamin_k": None,
         "action": interp["action"],
-        "notes": interp["notes"]
+        "notes": interp["notes"],
+        "not_a_prescription": True,
     }
+
+
 
 
 def generate_daily_schedule(
@@ -306,105 +251,53 @@ def calculate_ttr_rosendaal(
     target_low: float = INR_THERAPEUTIC_LOW,
     target_high: float = INR_THERAPEUTIC_HIGH
 ) -> Dict[str, Any]:
+    """Time in range from piecewise linear interpolation between measured INRs.
+
+    No extrapolation is made outside the observed dates. Duplicate measurement
+    days are rejected rather than silently omitted.
     """
-    Calculate Time in Therapeutic Range using Rosendaal's linear interpolation method.
-    
-    The Rosendaal method interpolates linearly between consecutive INR measurements
-    and calculates the percentage of time the interpolated INR falls within range.
-    
-    Args:
-        inr_values: List of INR measurements
-        dates_days: List of corresponding days (integers, e.g., days from start)
-        target_low: Lower bound of target INR range
-        target_high: Upper bound of target INR range
-        
-    Returns:
-        Dictionary with TTR calculation results
-    """
-    if len(inr_values) < 2:
-        raise ValueError("Need at least 2 INR values for TTR calculation")
-    if len(inr_values) != len(dates_days):
-        raise ValueError("INR values and dates must have same length")
-    
-    # Sort by date
-    paired = sorted(zip(dates_days, inr_values))
-    dates_sorted = [p[0] for p in paired]
-    inr_sorted = [p[1] for p in paired]
-    
-    total_days = 0
-    days_in_range = 0
-    
-    for i in range(len(dates_sorted) - 1):
-        t_start = dates_sorted[i]
-        t_end = dates_sorted[i + 1]
-        inr_start = inr_sorted[i]
-        inr_end = inr_sorted[i + 1]
-        
-        interval_days = t_end - t_start
-        if interval_days <= 0:
-            continue
-        
-        total_days += interval_days
-        
-        # Linear interpolation
-        # Check if entire interval is in range
-        if target_low <= inr_start <= target_high and target_low <= inr_end <= target_high:
-            days_in_range += interval_days
-        # Check if entire interval is out of range
-        elif (inr_start < target_low and inr_end < target_low) or \
-             (inr_start > target_high and inr_end > target_high):
-            pass  # 0 days in range
-        else:
-            # Find crossover points
-            # INR(t) = inr_start + (inr_end - inr_start) * (t - t_start) / (t_end - t_start)
-            slope = (inr_end - inr_start) / interval_days
-            
-            # Find time when INR crosses target_low
-            t_low = None
-            if slope != 0:
-                t_low_candidate = t_start + (target_low - inr_start) / slope
-                if t_start <= t_low_candidate <= t_end:
-                    t_low = t_low_candidate
-            
-            # Find time when INR crosses target_high
-            t_high = None
-            if slope != 0:
-                t_high_candidate = t_start + (target_high - inr_start) / slope
-                if t_start <= t_high_candidate <= t_end:
-                    t_high = t_high_candidate
-            
-            # Calculate time in range within this interval
-            crossover_times = sorted(filter(None, [t_low, t_high]))
-            
-            if len(crossover_times) == 2:
-                # Two crossovers - time in range is between them or outside
-                if inr_start < target_low:
-                    # Below -> in range -> above (or below -> above -> below)
-                    days_in_range += crossover_times[1] - crossover_times[0]
-                elif inr_start > target_high:
-                    # Above -> in range -> below
-                    days_in_range += crossover_times[1] - crossover_times[0]
-                else:
-                    # In range -> out -> in range
-                    days_in_range += (crossover_times[0] - t_start) + (t_end - crossover_times[1])
-            elif len(crossover_times) == 1:
-                # One crossover
-                if target_low <= inr_start <= target_high:
-                    days_in_range += crossover_times[0] - t_start
-                elif target_low <= inr_end <= target_high:
-                    days_in_range += t_end - crossover_times[0]
-    
-    ttr = (days_in_range / total_days * 100) if total_days > 0 else 0
-    
+    if len(inr_values) < 2 or len(inr_values) != len(dates_days):
+        raise ValueError("At least two INRs and one matching date per INR are required")
+    _validate_measurements(inr_values, target_low, target_high)
+    if not all(isinstance(d, (int, float)) and math.isfinite(d) for d in dates_days):
+        raise ValueError("Measurement days must be finite numbers")
+    pairs = sorted(zip(dates_days, inr_values))
+    if any(b[0] <= a[0] for a, b in zip(pairs, pairs[1:])):
+        raise ValueError("Measurement days must be unique")
+    total_days = 0.0
+    days_in_range = 0.0
+    for (d0, v0), (d1, v1) in zip(pairs, pairs[1:]):
+        duration = d1 - d0
+        total_days += duration
+        fractions = [0.0, 1.0]
+        if v0 != v1:
+            for boundary in (target_low, target_high):
+                fraction = (boundary - v0) / (v1 - v0)
+                if 0 < fraction < 1:
+                    fractions.append(fraction)
+        fractions = sorted(set(fractions))
+        for start, end in zip(fractions, fractions[1:]):
+            midpoint_inr = v0 + (v1 - v0) * (start + end) / 2
+            if target_low <= midpoint_inr <= target_high:
+                days_in_range += (end - start) * duration
+    ttr = 100 * days_in_range / total_days
     return {
         "ttr_percent": round(ttr, 1),
-        "days_in_range": round(days_in_range, 1),
+        "days_in_range": round(days_in_range, 2),
         "total_days": total_days,
         "target_range": f"{target_low}-{target_high}",
         "num_inr_values": len(inr_values),
         "inr_values": inr_values,
-        "quality": "GOOD" if ttr >= 65 else ("MODERATE" if ttr >= 50 else "POOR")
+        "quality": "GOOD" if ttr >= 65 else ("MODERATE" if ttr >= 50 else "POOR"),
     }
+
+
+def _validate_measurements(inr_values: List[float], target_low: float, target_high: float) -> None:
+    _validate_inr_and_target(1.0, target_low, target_high)
+    if not inr_values or any(not isinstance(v, (int, float)) or not math.isfinite(v) or v <= 0 for v in inr_values):
+        raise ValueError("INR measurements must be finite positive numbers")
+
+
 
 
 def calculate_ttr_simple(
@@ -426,6 +319,7 @@ def calculate_ttr_simple(
     if not inr_values:
         raise ValueError("Need at least 1 INR value")
     
+    _validate_measurements(inr_values, target_low, target_high)
     in_range = sum(1 for inr in inr_values if target_low <= inr <= target_high)
     ttr = (in_range / len(inr_values)) * 100
     
@@ -469,6 +363,8 @@ def apply_pharmacogenomic_adjustment(
     Returns:
         Dictionary with pharmacogenomic-adjusted dose
     """
+    if not isinstance(base_weekly_dose_mg, (int, float)) or not math.isfinite(base_weekly_dose_mg) or base_weekly_dose_mg <= 0:
+        raise ValueError("Base weekly dose must be finite and positive")
     cyp2c9_key = cyp2c9_metabolizer.lower().strip()
     vkorc1_key = vkorc1_sensitivity.lower().strip()
     
@@ -494,7 +390,8 @@ def apply_pharmacogenomic_adjustment(
         "combined_multiplier": round(combined_multiplier, 3),
         "adjusted_weekly_dose_mg": round(adjusted_dose, 1),
         "adjusted_daily_dose_mg": round(adjusted_dose / 7, 1),
-        "notes": "Pharmacogenomic adjustments are estimates. Clinical response and INR monitoring remain essential."
+        "notes": "UNVALIDATED illustrative sensitivity multipliers; NOT CPIC/IWPC/Gage dosing. Do not use for clinical prescribing.",
+        "not_a_prescription": True
     }
 
 
@@ -520,8 +417,12 @@ def generate_taper_schedule(
     Returns:
         Dictionary with tapering schedule
     """
-    if current_weekly_dose_mg <= 0:
-        raise ValueError("Current dose must be positive")
+    if not math.isfinite(current_weekly_dose_mg) or current_weekly_dose_mg <= 0:
+        raise ValueError("Current dose must be finite and positive")
+    if not math.isfinite(target_weekly_dose_mg) or not math.isfinite(reduction_percent):
+        raise ValueError("Dose and reduction must be finite")
+    if interval_days <= 0:
+        raise ValueError("Interval must be positive")
     if target_weekly_dose_mg < 0:
         raise ValueError("Target dose must be non-negative")
     if reduction_percent <= 0 or reduction_percent >= 100:
@@ -596,19 +497,21 @@ def full_warfarin_assessment(
     Returns:
         Complete assessment dictionary
     """
-    # INR interpretation
-    inr_interp = interpret_inr(inr)
+    # INR interpretation uses the selected target; the genetic sensitivity
+    # illustration is intentionally not applied to a titrated maintenance dose.
+    inr_interp = interpret_inr(inr, target_inr_low, target_inr_high)
     
     # Dose adjustment
     dose_adj = calculate_new_weekly_dose(current_weekly_dose_mg, inr, target_inr_low, target_inr_high)
     
-    # Pharmacogenomic adjustment
-    pgx = apply_pharmacogenomic_adjustment(
-        dose_adj["new_weekly_dose_mg"],
-        cyp2c9_metabolizer,
-        vkorc1_sensitivity
-    )
-    
+    # Do not multiply INR-derived maintenance doses by arbitrary genotype scalars.
+    pgx = {
+        "cyp2c9_status": cyp2c9_metabolizer,
+        "vkorc1_status": vkorc1_sensitivity,
+        "applied_to_maintenance_dose": False,
+        "notes": "Use a validated genotype-guided initiation algorithm where indicated; not applied to titrated maintenance dosing.",
+    }
+
     # TTR calculation if historical data available
     ttr = None
     if recent_inr_values and len(recent_inr_values) >= 2:
@@ -618,7 +521,8 @@ def full_warfarin_assessment(
             ttr = calculate_ttr_simple(recent_inr_values, target_inr_low, target_inr_high)
     
     # Daily schedule
-    schedule = generate_daily_schedule(pgx["adjusted_weekly_dose_mg"])
+    schedule = (generate_daily_schedule(dose_adj["new_weekly_dose_mg"])
+                if dose_adj["new_weekly_dose_mg"] is not None else None)
     
     return {
         "inr_interpretation": inr_interp,
@@ -626,7 +530,7 @@ def full_warfarin_assessment(
         "pharmacogenomic_adjustment": pgx,
         "time_in_therapeutic_range": ttr,
         "daily_schedule": schedule,
-        "disclaimer": "FOR EDUCATIONAL/RESEARCH USE ONLY. Not a substitute for clinical pharmacist review."
+        "disclaimer": "FOR EDUCATIONAL/RESEARCH USE ONLY. Illustrative arithmetic is not a prescription; assess bleeding and indication with a qualified clinician."
     }
 
 
